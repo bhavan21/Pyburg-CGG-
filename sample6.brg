@@ -1,0 +1,90 @@
+%term EQUALS=1 DIV=2 MUL=3 PLUS=4 SUB=5 NAME=6 CONST=7
+
+%%
+stmt: EQUALS(NAME,reg) =1 {sw $1, $2;};
+reg: DIV(reg,reg) =2 {div $$,$1,$2;};
+reg: MUL(reg,reg) =3 {mul $$,$1,$2;};
+reg: PLUS(reg,reg) =4 {add $$,$1,$2;};
+reg: SUB(reg,reg) =5 {sub $$,$1,$2;};
+reg: CONST =6 {}<$1>;
+reg: NAME =7 {lw $$, $1;};
+%%
+
+EQUALS=1
+DIV=2
+MUL=3
+PLUS=4
+SUB=5
+NAME=6
+CONST=7
+
+
+offset=0
+mem={}
+
+def getVariableOffset(var):
+	global offset
+	if var not in mem.keys():
+		offset += 4;
+		mem[var] = offset
+	ret = "%d($sp)"%(offset)
+	return ret
+
+
+# n = 100
+# i = 5
+# t = (n/i)
+# s = (t*(t+1))/2
+# ret = (s + 10 * (s*s - 4*((t/2)*(t/2))))/2
+
+ast = [
+	(EQUALS,'n',100),
+	(EQUALS,'i',5),
+	(EQUALS,'t',(DIV,'n','i')),
+	(EQUALS,'s',(DIV,(MUL,'t',(PLUS,'t',1)),2)),
+	(EQUALS,'ret',(DIV,(PLUS,'s',(MUL,10,(SUB,(MUL,'s','s'),(MUL,4,(MUL,(DIV,'t',2),(DIV,'t',3)))))),2))
+]
+
+class tupleToAST:
+	def __init__(self,ast):
+		self.type = None
+		self.value = None
+		self.children = []
+		if type(ast) == type((0, 0)):
+			self.type = ast[0]
+			if ast[1]: self.children.append(tupleToAST(ast[1]))
+			if ast[2]: self.children.append(tupleToAST(ast[2]))
+		else:
+			self.value = ast
+			if type(ast) == type('s'):
+				self.type = NAME
+			else:
+				self.type = CONST
+
+	def getType(self):
+		return self.type
+
+	def getValue(self):
+		return self.value
+
+	def getChildren(self):
+		return self.children
+
+registers = ["$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7", "$t8", "$t9",
+ "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7", "$s8", "$s9"]
+
+setEnvironment(registers = registers, variableOffsetFunc = getVariableOffset)
+
+def main():
+	for p in ast:
+		p = tupleToAST(p)
+		node = initializeNode(p)
+		node.label()
+		dumpcover(node)
+		printInstructions(node)
+		print()
+
+if __name__== "__main__":
+	main()
+
+
